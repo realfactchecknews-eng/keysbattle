@@ -163,7 +163,15 @@ main{max-width:1240px;margin:auto;padding:26px 16px 60px}
 @keyframes shake{20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
 .burn{animation:burn 1.1s forwards}
 @keyframes burn{to{filter:grayscale(1) brightness(.2) blur(4px);transform:scale(.75) translateY(24px) rotate(8deg);opacity:0}}
-.addbal{width:100%;margin-top:10px;display:grid;gap:6px;justify-items:center}.addbal input{margin:0}.coinstake{font:800 22px Unbounded;margin:10px 0 0}
+.addbal{width:100%;margin-top:14px;display:grid;gap:8px;padding:12px 14px;border-radius:14px;background:#ffffff06}
+.slhead,.slfoot{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--mut)}.slhead b{color:var(--txt);font-size:15px}.slfoot{font-size:11px}
+.slider{-webkit-appearance:none;appearance:none;width:100%;height:10px;margin:6px 0;padding:0;border:0;border-radius:6px;cursor:pointer;background:linear-gradient(90deg,#ffd24a,#ff7a00) 0/var(--v) 100% no-repeat,#ffffff14;box-shadow:inset 0 1px 3px #0008}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff6c2,#ffc629 45%,#b86e00);box-shadow:0 0 0 5px #ffb80030,0 0 18px #ffb80088,0 4px 10px #0009;transition:transform .15s,box-shadow .15s}
+.slider:hover::-webkit-slider-thumb{box-shadow:0 0 0 7px #ffb80040,0 0 24px #ffb800aa,0 4px 10px #0009}
+.slider:active::-webkit-slider-thumb{transform:scale(1.18)}
+.slider::-moz-range-thumb{width:26px;height:26px;border:0;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff6c2,#ffc629 45%,#b86e00);box-shadow:0 0 0 5px #ffb80030,0 0 18px #ffb80088}
+.slider:disabled{opacity:.35;cursor:default}
+#uarc{transition:stroke-dasharray .15s ease-out}
 .pick2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
 .phd{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}.phd h3{margin:0}
 
@@ -478,28 +486,44 @@ PAGES.upgrade=el=>{
   <div class="panel"><div class="phd"><h3>Цель</h3><div class="seg" id="uch">${[1.5,2,3,5,10,20].map(m=>`<button data-m="${m}">x${m}</button>`).join('')}</div></div>
   <input id="uq" placeholder="Поиск: Dragon Lore, Karambit…"><div class="grid sm scroll" id="ug"></div></div></div>`;
   const sum=()=>up.sel.reduce((a,u)=>a+price(byUid(u)),0)+up.coins;
-  const setCoins=v=>{up.coins=Math.max(0,Math.min(Math.floor(v)||0,st.bal));if(up.t&&up.t.p<=sum())up.t=null;top();targets()};
+  // обновление шанса на лету, без перерисовки (чтобы не прерывать перетаскивание ползунка)
+  let lastBeep=0;
+  const live=()=>{
+    const s=sum(),t=up.t,p=chance(),C=2*Math.PI*84,sl=$('#uc',el);
+    $('#ucv',el).innerHTML=fmt(up.coins);
+    $('#usum',el).innerHTML=s?`Ставка ${fmt(s)}`:'';
+    $('#uarc',el).setAttribute('stroke-dasharray',`${p/100*C} ${C}`);
+    $('#upct',el).innerHTML=`${p.toFixed(2)}<small>%</small>`;
+    $('#ux',el).textContent=p?'x'+(t.p/s).toFixed(2):'шанс';
+    $('#ub',el).disabled=!p||up.busy;
+    sl.style.setProperty('--v',(+sl.max?up.coins/sl.max*100:0)+'%');
+    if(p&&Date.now()-lastBeep>60){lastBeep=Date.now();beep(500+p*10,.02,'sine',.02)}
+  };
   const chance=()=>up.t&&sum()>0?Math.min(100,sum()/up.t.p*100):0;
   const top=()=>{
-    const items=up.sel.map(byUid),s=sum(),t=up.t,p=chance(),C=2*Math.PI*84;
+    const items=up.sel.map(byUid),t=up.t,base=items.reduce((a,x)=>a+price(x),0);
+    const smax=up.busy?up.coins:Math.max(0,t?Math.min(st.bal,t.p-base-1):st.bal);
+    if(up.coins>smax)up.coins=smax;
+    const s=sum(),p=chance(),C=2*Math.PI*84;
     $('#ut',el).innerHTML=`<div class="upg">
     <div class="uslot" id="us">${items.length?`<div class="stack n${items.length}">${items.map(x=>card(x)).join('')}</div>`:up.coins?'':'<div class="ph"><span>＋</span>Выбери предметы<small>и/или добавь монеты</small></div>'}
-     ${up.coins?`<div class="coinstake">+ ${fmt(up.coins)}</div>`:''}
-     <div class="addbal"><input id="uc" type="number" min="0" placeholder="Добавить монеты к ставке" value="${up.coins||''}" ${up.busy?'disabled':''}>
-     <div class="seg">${[['+100',100],['+1к',1000],['+10к',10000],['×2',-2],['Сброс',0]].map(([t,v])=>`<button data-uc="${v}">${t}</button>`).join('')}</div></div>
-     ${s?`<div class="sum">Ставка ${fmt(s)}</div>`:''}</div>
+     <div class="addbal"><div class="slhead"><span>Монеты к ставке</span><b id="ucv">${fmt(up.coins)}</b></div>
+     <input id="uc" class="slider" type="range" min="0" max="${smax}" value="${up.coins}" style="--v:${smax?up.coins/smax*100:0}%" ${up.busy||!smax?'disabled':''}>
+     <div class="slfoot"><span>0</span><span>${fmt(smax)}</span></div></div>
+     <div class="sum" id="usum">${s?`Ставка ${fmt(s)}`:''}</div></div>
     <div><div class="wheel ${up.busy?'spin':''}" id="wh"><svg viewBox="0 0 200 200"><defs><linearGradient id="ga" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset="1" stop-color="#ff7a00"/></linearGradient></defs>
       ${Array.from({length:72},(_,i)=>`<line x1="100" y1="2" x2="100" y2="${i%6?6:10}" stroke="#ffffff${i%6?'1c':'44'}" transform="rotate(${i*5} 100 100)"/>`).join('')}
       <circle cx="100" cy="100" r="84" fill="none" stroke="#ffffff0d" stroke-width="16"/>
-      <circle cx="100" cy="100" r="84" fill="none" stroke="url(#ga)" stroke-width="16" stroke-dasharray="${p/100*C} ${C}" transform="rotate(-90 100 100)"/></svg>
+      <circle id="uarc" cx="100" cy="100" r="84" fill="none" stroke="url(#ga)" stroke-width="16" stroke-dasharray="${p/100*C} ${C}" transform="rotate(-90 100 100)"/></svg>
       <div class="needle" id="nd" style="transform:rotate(${up.rot}deg)"><i></i></div>
-      <div class="mid"><b>${p.toFixed(2)}<small>%</small></b><span>${p?'x'+(t.p/s).toFixed(2):'шанс'}</span></div></div>
+      <div class="mid"><b id="upct">${p.toFixed(2)}<small>%</small></b><span id="ux">${p?'x'+(t.p/s).toFixed(2):'шанс'}</span></div></div>
       <div class="row"><div class="seg"><button data-um="n" class="${up.mode==='n'?'on':''}">Обычный</button><button data-um="g" class="${up.mode==='g'?'on':''}">Азартный</button></div></div>
       <button class="btn big wide" id="ub" ${p&&!up.busy?'':'disabled'}>${up.busy?'Крутим…':'Апгрейд'}</button></div>
     <div class="uslot" id="ud">${t?card(t,{cls:'big',price:fmt(t.p)}):'<div class="ph"><span>◎</span>Выбери цель<small>из списка ниже</small></div>'}</div></div>`;
     
-    $('#uc',el).onchange=e=>{if(!up.busy)setCoins(+e.target.value)};
-    $$('[data-uc]',el).forEach(b=>b.onclick=()=>{if(up.busy)return;const v=+b.dataset.uc;setCoins(v===0?0:v===-2?up.coins*2:up.coins+v)});
+    const sl=$('#uc',el);
+    sl.oninput=()=>{if(!up.busy){up.coins=+sl.value;live()}};
+    sl.onchange=()=>{if(!up.t)targets()};
     $$('[data-um]',el).forEach(b=>b.onclick=()=>{if(!up.busy){up.mode=b.dataset.um;top()}});
     $('#ub',el).onclick=run;
   };
