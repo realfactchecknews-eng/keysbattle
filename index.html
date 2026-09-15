@@ -107,7 +107,7 @@ let st;try{st=JSON.parse(localStorage.kb)}catch(e){}
 st=st||{bal:1000,inv:[],bonus:0};
 const save=()=>{try{localStorage.kb=JSON.stringify(st)}catch(e){};$('#bal').textContent='🪙 '+st.bal.toLocaleString('ru')};
 const toast=t=>{const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2500)};
-const card=(s,extra='')=>`<div class="it" style="--c:var(--t${s[1]})" ${extra}><img loading="lazy" src="${IMG+s[2]}"><div class="n" title="${s[0]}">${s[0]}</div><div class="v">🪙 ${s.price.toLocaleString('ru')}</div></div>`;
+const card=(s,extra='')=>`<div class="it" style="--c:var(--t${s[1]})" ${extra}><img src="${IMG+s[2]}"><div class="n" title="${s[0]}">${s[0]}</div><div class="v">🪙 ${s.price.toLocaleString('ru')}</div></div>`;
 
 function roll(c){
   let x=R()*c.w.reduce((a,b)=>a+b),t=0;
@@ -146,10 +146,10 @@ function openPage(c){
     const win=roll(c),N=50,items=Array.from({length:N+6},(_,i)=>i===N?win:roll(c));
     strip.style.transition='none';strip.style.transform='translateX(0)';
     strip.innerHTML=items.map(s=>card(s)).join('');
-    const w=strip.children[0].offsetWidth+6,box=strip.parentNode.offsetWidth;
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const el=strip.children[N],w=el.offsetWidth,box=strip.parentNode.offsetWidth;
       strip.style.transition='transform 6s cubic-bezier(.12,.7,.15,1)';
-      strip.style.transform=`translateX(${-(N*w+w/2-box/2)+(R()-.5)*(w-20)}px)`;
+      strip.style.transform=`translateX(${-(el.offsetLeft+w/2-box/2)+(R()-.5)*(w-20)}px)`;
     }));
     setTimeout(()=>{
       const uid=Date.now();st.inv.unshift({uid,id:win.id});save();feed(win,'Ты');
