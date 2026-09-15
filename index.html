@@ -163,6 +163,7 @@ main{max-width:1240px;margin:auto;padding:26px 16px 60px}
 @keyframes shake{20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
 .burn{animation:burn 1.1s forwards}
 @keyframes burn{to{filter:grayscale(1) brightness(.2) blur(4px);transform:scale(.75) translateY(24px) rotate(8deg);opacity:0}}
+.addbal{width:100%;margin-top:10px;display:grid;gap:6px;justify-items:center}.addbal input{margin:0}.coinstake{font:800 22px Unbounded;margin:10px 0 0}
 .pick2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
 .phd{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}.phd h3{margin:0}
 
@@ -469,19 +470,24 @@ PAGES.inv=el=>{
 
 // ---------- Апгрейд ----------
 // шанс = ставка / цена цели, без комиссии
-const up={sel:[],t:null,mode:'n',busy:false,rot:0,m:2,q:''};
+const up={sel:[],t:null,coins:0,mode:'n',busy:false,rot:0,m:2,q:''};
 PAGES.upgrade=el=>{
   up.sel=up.sel.filter(byUid);
-  el.innerHTML=`<h1 class="ttl">Апгрейд</h1><p class="sub">Поставь до 6 предметов и выбери цель. Шанс = стоимость ставки / стоимость цели, без комиссии. Зона шанса начинается сверху от стрелки.</p><div id="ut"></div>
+  el.innerHTML=`<h1 class="ttl">Апгрейд</h1><p class="sub">Поставь до 6 предметов и/или монеты и выбери цель. Шанс = стоимость ставки / стоимость цели, без комиссии. Зона шанса начинается сверху от стрелки.</p><div id="ut"></div>
   <div class="pick2"><div class="panel"><div class="phd"><h3>Твои предметы</h3></div><div class="grid sm scroll" id="um"></div></div>
   <div class="panel"><div class="phd"><h3>Цель</h3><div class="seg" id="uch">${[1.5,2,3,5,10,20].map(m=>`<button data-m="${m}">x${m}</button>`).join('')}</div></div>
   <input id="uq" placeholder="Поиск: Dragon Lore, Karambit…"><div class="grid sm scroll" id="ug"></div></div></div>`;
-  const sum=()=>up.sel.reduce((a,u)=>a+price(byUid(u)),0);
-  const chance=()=>up.t&&up.sel.length?Math.min(100,sum()/up.t.p*100):0;
+  const sum=()=>up.sel.reduce((a,u)=>a+price(byUid(u)),0)+up.coins;
+  const setCoins=v=>{up.coins=Math.max(0,Math.min(Math.floor(v)||0,st.bal));if(up.t&&up.t.p<=sum())up.t=null;top();targets()};
+  const chance=()=>up.t&&sum()>0?Math.min(100,sum()/up.t.p*100):0;
   const top=()=>{
     const items=up.sel.map(byUid),s=sum(),t=up.t,p=chance(),C=2*Math.PI*84;
     $('#ut',el).innerHTML=`<div class="upg">
-    <div class="uslot" id="us">${items.length?`<div class="stack n${items.length}">${items.map(x=>card(x)).join('')}</div><div class="sum">Ставка ${fmt(s)}</div>`:'<div class="ph"><span>＋</span>Выбери свои предметы<small>до 6 штук</small></div>'}</div>
+    <div class="uslot" id="us">${items.length?`<div class="stack n${items.length}">${items.map(x=>card(x)).join('')}</div>`:up.coins?'':'<div class="ph"><span>＋</span>Выбери предметы<small>и/или добавь монеты</small></div>'}
+     ${up.coins?`<div class="coinstake">+ ${fmt(up.coins)}</div>`:''}
+     <div class="addbal"><input id="uc" type="number" min="0" placeholder="Добавить монеты к ставке" value="${up.coins||''}" ${up.busy?'disabled':''}>
+     <div class="seg">${[['+100',100],['+1к',1000],['+10к',10000],['×2',-2],['Сброс',0]].map(([t,v])=>`<button data-uc="${v}">${t}</button>`).join('')}</div></div>
+     ${s?`<div class="sum">Ставка ${fmt(s)}</div>`:''}</div>
     <div><div class="wheel ${up.busy?'spin':''}" id="wh"><svg viewBox="0 0 200 200"><defs><linearGradient id="ga" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset="1" stop-color="#ff7a00"/></linearGradient></defs>
       ${Array.from({length:72},(_,i)=>`<line x1="100" y1="2" x2="100" y2="${i%6?6:10}" stroke="#ffffff${i%6?'1c':'44'}" transform="rotate(${i*5} 100 100)"/>`).join('')}
       <circle cx="100" cy="100" r="84" fill="none" stroke="#ffffff0d" stroke-width="16"/>
@@ -492,6 +498,8 @@ PAGES.upgrade=el=>{
       <button class="btn big wide" id="ub" ${p&&!up.busy?'':'disabled'}>${up.busy?'Крутим…':'Апгрейд'}</button></div>
     <div class="uslot" id="ud">${t?card(t,{cls:'big',price:fmt(t.p)}):'<div class="ph"><span>◎</span>Выбери цель<small>из списка ниже</small></div>'}</div></div>`;
     
+    $('#uc',el).onchange=e=>{if(!up.busy)setCoins(+e.target.value)};
+    $$('[data-uc]',el).forEach(b=>b.onclick=()=>{if(up.busy)return;const v=+b.dataset.uc;setCoins(v===0?0:v===-2?up.coins*2:up.coins+v)});
     $$('[data-um]',el).forEach(b=>b.onclick=()=>{if(!up.busy){up.mode=b.dataset.um;top()}});
     $('#ub',el).onclick=run;
   };
@@ -518,8 +526,9 @@ PAGES.upgrade=el=>{
   $$('#uch button',el).forEach(b=>b.onclick=()=>{up.m=+b.dataset.m;up.q='';$('#uq',el).value='';targets()});
   $('#uq',el).oninput=e=>{up.q=e.target.value;targets()};
   const run=async()=>{
+    if(up.coins>st.bal)return toast('Недостаточно монет');
     const t=up.t,p=chance(),ang=rnd()*360,win=ang<p*3.6;
-    up.busy=true;top();
+    up.busy=true;st.bal-=up.coins;save();top();
     const nd=$('#nd',el),r=d=>({transform:`rotate(${d}deg)`}),b=up.rot;let kf,dur;
     if(up.mode==='g'){ // азартный: разгон, разворот назад, снова вперёд, проскок и откат к результату
       const to=360*7+ang,sd=rnd()<.5?1:-1;
@@ -530,7 +539,7 @@ PAGES.upgrade=el=>{
     const a=nd.animate(kf,{duration:dur,easing:up.mode==='g'?'linear':'cubic-bezier(.25,.1,.05,1)',fill:'forwards'});
     let last=0;(function loop(){if(a.playState==='finished'||a.playState==='idle')return;const m=new DOMMatrix(getComputedStyle(nd).transform),g=Math.floor((Math.atan2(m.b,m.a)*180/Math.PI+360)/10);if(g!==last){last=g;tick()}requestAnimationFrame(loop)})();
     await a.finished;up.rot=ang;
-    const used=up.sel.slice();st.inv=st.inv.filter(x=>!used.includes(x.uid));st.stats.upT++;
+    const used=up.sel.slice();st.inv=st.inv.filter(x=>!used.includes(x.uid));st.stats.upT++;up.coins=0;
     const wh=$('#wh',el);wh.classList.remove('spin');
     if(win){st.stats.upW++;const g=give(fromVar(t));up.sel=[g.uid];wh.classList.add('win');$('#ud .it',el).classList.add('hit');confetti(['#3dff8a','#ffd700','#fff']);chime();feed(g,'Ты');toast(`Апгрейд успешен: <b>${SKINS[t.id][0]}</b>`)}
     else{up.sel=[];wh.classList.add('lose');$$('#us .it',el).forEach(d=>d.classList.add('burn'));sad();toast('Апгрейд не удался')}
