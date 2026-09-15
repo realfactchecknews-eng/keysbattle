@@ -272,14 +272,12 @@ VARS.sort((a,b)=>a.p-b.p);
 function fromVar(v){const s=SKINS[v.id];let f=null;if(!s.nw){const lo=Math.max(WB[v.w],s[3]),hi=Math.min(WB[v.w+1],s[4]);f=lo+rnd()*(hi-lo)}return{id:v.id,w:v.w,st:v.st,f}}
 
 // ---------- кейсы ----------
-const CS_ODDS={2:79.92,3:15.98,4:3.2,5:.64,6:.26}; // официальные шансы CS2
 const CASES=[];
 function addCase(c){
   c.items=c.items.filter(x=>x.w>0);
   c.W=c.items.reduce((a,x)=>a+x.w,0);
   c.ev=c.items.reduce((a,x)=>a+x.w*SKINS[x.id].ev,0)/c.W;
-  if(!c.p)c.p=Math.ceil(c.ev/.9);
-  const top=c.items.reduce((a,x)=>SKINS[x.id].ev>SKINS[a.id].ev?x:a);
+    const top=c.items.reduce((a,x)=>SKINS[x.id].ev>SKINS[a.id].ev?x:a);
   c.color=RC[SKINS[top.id][1]];
   if(!c.img)c.img=IMG+SKINS[top.id][2];
   let acc=0;c.cum=c.items.map(x=>acc+=x.w);
@@ -295,15 +293,15 @@ const wpn=(...w)=>s=>w.some(x=>s[0].startsWith(x+' |'));
 const starts=(...n)=>s=>n.some(x=>s[0].startsWith(x));
 // Тематические кейсы: цена дропа распределена логнормально вокруг цены кейса —
 // в основном среднячок, крупные иксы и копеечный дроп редко. Центр подбирается под окупаемость 90%.
-const SIG=.8;
-function themed(n,P,f){
-  const pool=SKINS.filter(f),L=pool.map(s=>Math.log(s.ev)),bin=L.map(l=>Math.floor(l/.25)),cnt={};
+const SIG=.8,RTP=1; // окупаемость кейсов 100%
+function themed(n,P,f,opt={}){
+  const pool=Array.isArray(f)?f.map(i=>SKINS[i]):SKINS.filter(f),L=pool.map(s=>Math.log(s.ev)),bin=L.map(l=>Math.floor(l/.25)),cnt={};
   bin.forEach(b=>cnt[b]=(cnt[b]||0)+1);
   const make=mu=>pool.map((s,i)=>({id:s.id,w:Math.exp(-((L[i]-Math.log(P)-mu)**2)/(2*SIG*SIG))/cnt[bin[i]]}));
   const EV=it=>{let W=0,E=0;for(const x of it){W+=x.w;E+=x.w*SKINS[x.id].ev}return E/W};
-  let lo=-8,hi=4;for(let k=0;k<40;k++){const m=(lo+hi)/2;EV(make(m))<.9*P?lo=m:hi=m}
+  let lo=-8,hi=4;for(let k=0;k<40;k++){const m=(lo+hi)/2;EV(make(m))<RTP*P?lo=m:hi=m}
   const items=make(lo),e=EV(items);
-  addCase({themed:1,n,items,p:Math.abs(e-.9*P)<.03*P?P:Math.ceil(e/.9)});
+  addCase({themed:!opt.g,...opt,n,items,p:Math.abs(e-RTP*P)<.03*P?P:Math.ceil(e/RTP)});
 }
 const PISTOL=wpn('Glock-18','USP-S','P2000','P250','Desert Eagle','Five-SeveN','Tec-9','CZ75-Auto','Dual Berettas','R8 Revolver');
 [['Мелочь',15,()=>1],['Сотка',100,()=>1],['Бюджетный',500,()=>1],['Пистолетный',1000,PISTOL],['Glock-18',1500,wpn('Glock-18')],['USP-S',2000,wpn('USP-S')],
@@ -314,10 +312,7 @@ const PISTOL=wpn('Glock-18','USP-S','P2000','P250','Desert Eagle','Five-SeveN','
 ].forEach(a=>themed(...a));
 CASES.forEach(c=>{if(c.themed)c.g=c.p<1000?'Недорогие кейсы':c.p<20000?'Средние кейсы':'Дорогие кейсы'});
 CASES.sort((a,b)=>(!!b.themed-!!a.themed)||(a.themed?a.p-b.p:0));
-REAL.slice().reverse().forEach(([n,img,p,ids,rare])=>{
-  const by={};ids.forEach(i=>(by[SKINS[i][1]]??=[]).push(i));if(rare.length)by[6]=rare;
-  addCase({g:'Официальные кейсы CS2',n,p,img:img.startsWith('http')?img:IMG+img,items:Object.keys(CS_ODDS).flatMap(t=>(by[t]||[]).map(id=>({id,w:CS_ODDS[t]/by[t].length})))});
-});
+REAL.slice().reverse().forEach(([n,img,p,ids,rare])=>themed(n,p,[...ids,...rare],{g:'Официальные кейсы CS2',img:img.startsWith('http')?img:IMG+img}));
 
 // ---------- состояние ----------
 const DEF={bal:3000,inv:[],bonus:0,xp:0,n:0,sound:true,mode:'h',stats:{opened:0,best:null,upW:0,upT:0,ct:0,bw:0,bt:0}};
@@ -414,7 +409,7 @@ const caseCard=(c,cls='')=>`<div class="case ${cls}" data-c="${CASES.indexOf(c)}
 
 PAGES.cases=el=>{
   const top=VARS.slice(-400),hs=[pick(top),pick(top),pick(top)];
-  el.innerHTML=`<section class="hero"><div><div class="pill">● Честный рандом · шансы как в CS2</div><h1>Кейсы CS2<br><span>без реальных денег</span></h1>
+  el.innerHTML=`<section class="hero"><div><div class="pill">● Честный рандом · окупаемость 100%</div><h1>Кейсы CS2<br><span>без реальных денег</span></h1>
     <p>Настоящие скины и рыночные цены Skinport. Износ выпадает по float, StatTrak — с шансом 10%. Вероятность каждого предмета открыта.</p>
     <div class="row l"><button class="btn big" data-go="battles">Кейс-батл</button><button class="btn big ghost" data-go="upgrade">Апгрейд</button><button class="btn big ghost" data-go="contracts">Контракт</button></div></div>
     <div class="hs">${hs.map((v,i)=>`<img class="fl f${i}" src="${IMG+SKINS[v.id][2]}" alt="">`).join('')}</div></section>`
@@ -474,10 +469,10 @@ PAGES.inv=el=>{
 
 // ---------- Апгрейд ----------
 // шанс = ставка / цена цели, без комиссии
-const up={sel:[],t:null,under:true,mode:'n',busy:false,rot:0,m:2,q:''};
+const up={sel:[],t:null,mode:'n',busy:false,rot:0,m:2,q:''};
 PAGES.upgrade=el=>{
   up.sel=up.sel.filter(byUid);
-  el.innerHTML=`<h1 class="ttl">Апгрейд</h1><p class="sub">Поставь до 6 предметов и выбери цель. Шанс = стоимость ставки / стоимость цели, без комиссии.</p><div id="ut"></div>
+  el.innerHTML=`<h1 class="ttl">Апгрейд</h1><p class="sub">Поставь до 6 предметов и выбери цель. Шанс = стоимость ставки / стоимость цели, без комиссии. Зона шанса начинается сверху от стрелки.</p><div id="ut"></div>
   <div class="pick2"><div class="panel"><div class="phd"><h3>Твои предметы</h3></div><div class="grid sm scroll" id="um"></div></div>
   <div class="panel"><div class="phd"><h3>Цель</h3><div class="seg" id="uch">${[1.5,2,3,5,10,20].map(m=>`<button data-m="${m}">x${m}</button>`).join('')}</div></div>
   <input id="uq" placeholder="Поиск: Dragon Lore, Karambit…"><div class="grid sm scroll" id="ug"></div></div></div>`;
@@ -490,13 +485,13 @@ PAGES.upgrade=el=>{
     <div><div class="wheel ${up.busy?'spin':''}" id="wh"><svg viewBox="0 0 200 200"><defs><linearGradient id="ga" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset="1" stop-color="#ff7a00"/></linearGradient></defs>
       ${Array.from({length:72},(_,i)=>`<line x1="100" y1="2" x2="100" y2="${i%6?6:10}" stroke="#ffffff${i%6?'1c':'44'}" transform="rotate(${i*5} 100 100)"/>`).join('')}
       <circle cx="100" cy="100" r="84" fill="none" stroke="#ffffff0d" stroke-width="16"/>
-      <circle cx="100" cy="100" r="84" fill="none" stroke="url(#ga)" stroke-width="16" stroke-dasharray="${p/100*C} ${C}" transform="rotate(${up.under?-90:-90+(100-p)*3.6} 100 100)"/></svg>
+      <circle cx="100" cy="100" r="84" fill="none" stroke="url(#ga)" stroke-width="16" stroke-dasharray="${p/100*C} ${C}" transform="rotate(-90 100 100)"/></svg>
       <div class="needle" id="nd" style="transform:rotate(${up.rot}deg)"><i></i></div>
       <div class="mid"><b>${p.toFixed(2)}<small>%</small></b><span>${p?'x'+(t.p/s).toFixed(2):'шанс'}</span></div></div>
-      <div class="row"><div class="seg"><button data-ud="1" class="${up.under?'on':''}">Снизу</button><button data-ud="0" class="${up.under?'':'on'}">Сверху</button></div><div class="seg"><button data-um="n" class="${up.mode==='n'?'on':''}">Обычный</button><button data-um="g" class="${up.mode==='g'?'on':''}">Азартный</button></div></div>
+      <div class="row"><div class="seg"><button data-um="n" class="${up.mode==='n'?'on':''}">Обычный</button><button data-um="g" class="${up.mode==='g'?'on':''}">Азартный</button></div></div>
       <button class="btn big wide" id="ub" ${p&&!up.busy?'':'disabled'}>${up.busy?'Крутим…':'Апгрейд'}</button></div>
     <div class="uslot" id="ud">${t?card(t,{cls:'big',price:fmt(t.p)}):'<div class="ph"><span>◎</span>Выбери цель<small>из списка ниже</small></div>'}</div></div>`;
-    $$('[data-ud]',el).forEach(b=>b.onclick=()=>{if(!up.busy){up.under=b.dataset.ud==='1';top()}});
+    
     $$('[data-um]',el).forEach(b=>b.onclick=()=>{if(!up.busy){up.mode=b.dataset.um;top()}});
     $('#ub',el).onclick=run;
   };
@@ -523,7 +518,7 @@ PAGES.upgrade=el=>{
   $$('#uch button',el).forEach(b=>b.onclick=()=>{up.m=+b.dataset.m;up.q='';$('#uq',el).value='';targets()});
   $('#uq',el).oninput=e=>{up.q=e.target.value;targets()};
   const run=async()=>{
-    const t=up.t,p=chance(),ang=rnd()*360,win=up.under?ang<p*3.6:ang>=360-p*3.6;
+    const t=up.t,p=chance(),ang=rnd()*360,win=ang<p*3.6;
     up.busy=true;top();
     const nd=$('#nd',el),r=d=>({transform:`rotate(${d}deg)`}),b=up.rot;let kf,dur;
     if(up.mode==='g'){ // азартный: разгон, разворот назад, снова вперёд, проскок и откат к результату
