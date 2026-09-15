@@ -200,6 +200,11 @@ main{max-width:1240px;margin:auto;padding:26px 16px 60px}
 .stats small{display:block;color:var(--mut);font-size:12px}.stats b{font-size:18px}
 .stats .best{display:flex;align-items:center;gap:10px;border-color:var(--c)}.best img{width:70px}.best b{font-size:13px}
 .empty{text-align:center;padding:60px 0;color:var(--mut)}
+.farm{display:grid;place-items:center;gap:18px;padding:40px 16px;border-radius:26px;border:1px solid var(--line);background:radial-gradient(40% 60% at 50% 45%,#ffb80018,transparent),var(--s1);position:relative;overflow:hidden;user-select:none}
+.fbtn{width:220px;height:220px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff6c2,#ffc629 42%,#b86e00);box-shadow:0 0 60px #ffb80066,inset 0 -10px 20px #0004;font:800 44px Unbounded;color:#5a3500;transition:transform .08s}
+.fbtn:hover{box-shadow:0 0 90px #ffb80099,inset 0 -10px 20px #0004}.fbtn:active{transform:scale(.92)}
+.plus{position:absolute;font:800 22px Unbounded;color:var(--gold);pointer-events:none;text-shadow:0 0 12px #ffb800aa;animation:plus .9s ease-out forwards}
+@keyframes plus{to{transform:translateY(-90px);opacity:0}}
 
 @media(max-width:900px){
  header{height:auto;flex-wrap:wrap;padding:10px 12px;gap:8px}nav{order:3;width:100%;height:40px;overflow-x:auto;flex:none}.hr{margin-left:auto}.lvl>div{display:none}
@@ -212,7 +217,7 @@ main{max-width:1240px;margin:auto;padding:26px 16px 60px}
 <header>
   <div class="logo" data-go="cases">КЕЙС<span>БАТЛ</span><em>.рф</em></div>
   <nav id="nav">
-    <button data-go="cases">Кейсы</button><button data-go="battles">Батлы</button><button data-go="upgrade">Апгрейд</button><button data-go="contracts">Контракты</button><button data-go="inv">Инвентарь</button>
+    <button data-go="cases">Кейсы</button><button data-go="battles">Батлы</button><button data-go="upgrade">Апгрейд</button><button data-go="contracts">Контракты</button><button data-go="inv">Инвентарь</button><button data-go="farm">Фарм</button>
   </nav>
   <div class="hr">
     <div class="lvl" id="lvl"></div>
@@ -283,7 +288,7 @@ function roll(c){
 }
 const isGlove=s=>/Gloves|Hand Wraps/.test(s[0]),isKnife=s=>s[1]===6&&!isGlove(s);
 const wpn=(...w)=>s=>w.some(x=>s[0].startsWith(x+' |'));
-function themed(n,f,weights){addCase({g:'Тематические кейсы',n,tiers:Object.entries(weights).map(([t,w])=>({t:+t,w,items:SKINS.filter(s=>s[1]===+t&&f(s)).map(s=>s.id)}))})}
+function themed(n,f,weights){addCase({themed:1,n,tiers:Object.entries(weights).map(([t,w])=>({t:+t,w,items:SKINS.filter(s=>s[1]===+t&&f(s)).map(s=>s.id)}))})}
 const GUN={0:40,1:25,2:22,3:9,4:3.2,5:.8};
 themed('Бюджетный',()=>1,{0:55,1:28,2:13,3:4});
 themed('Пистолетный',wpn('Glock-18','USP-S','P2000','P250','Desert Eagle','Five-SeveN','Tec-9','CZ75-Auto','Dual Berettas','R8 Revolver'),GUN);
@@ -294,6 +299,25 @@ themed('Тайный',s=>1,{5:1});
 themed('Нож или ширпотреб',s=>s[1]===0||isKnife(s),{0:50,6:50});
 themed('Перчатки',isGlove,{6:1});
 themed('Ножи',isKnife,{6:1});
+const band=(lo,hi)=>s=>s.ev>=lo&&s.ev<hi,starts=(...n)=>s=>n.some(x=>s[0].startsWith(x));
+themed('Мелочь',band(0,30),{0:1,1:1,2:1,3:1});
+themed('Сотка',band(30,300),{0:30,1:30,2:25,3:12,4:3});
+themed('Glock-18',wpn('Glock-18'),GUN);
+themed('USP-S',wpn('USP-S'),GUN);
+themed('Desert Eagle',wpn('Desert Eagle'),GUN);
+themed('Средний класс',band(300,3000),{2:50,3:30,4:15,5:5});
+themed('Засекреченный',s=>1,{4:1});
+themed('AWP премиум',wpn('AWP'),{3:55,4:33,5:12});
+themed('AK-47 премиум',wpn('AK-47'),{3:55,4:33,5:12});
+themed('Дорогие скины',band(3000,30000),{3:20,4:30,5:50});
+themed('Дешёвые ножи',s=>isKnife(s)&&s.ev<40000,{6:1});
+themed('Спортивные перчатки',starts('★ Sport Gloves'),{6:1});
+themed('Karambit',starts('★ Karambit'),{6:1});
+themed('Butterfly Knife',starts('★ Butterfly Knife'),{6:1});
+themed('M9 Bayonet',starts('★ M9 Bayonet'),{6:1});
+themed('Коллекционер',band(100000,1e9),{3:1,4:1,5:1,6:1});
+CASES.forEach(c=>{if(c.themed)c.g=c.p<1000?'Недорогие кейсы':c.p<20000?'Средние кейсы':'Дорогие кейсы'});
+CASES.sort((a,b)=>(!!b.themed-!!a.themed)||(a.themed?a.p-b.p:0));
 REAL.slice().reverse().forEach(([n,img,p,ids,rare])=>{
   const by={};ids.forEach(i=>(by[SKINS[i][1]]??=[]).push(i));if(rare.length)by[6]=rare;
   addCase({g:'Официальные кейсы CS2',n,p,img:img.startsWith('http')?img:IMG+img,tiers:Object.keys(CS_ODDS).map(t=>({t:+t,w:CS_ODDS[t],items:by[t]||[]}))});
@@ -598,6 +622,20 @@ PAGES.battles=el=>{
     else{save();sad();const m=modal(`<div class="big-e">🏆</div><h3 class="mt">Победитель: ${W.n}</h3><p class="mut" style="margin:10px 0">Забирает ${all.length} предм. на ${fmt(sum)}</p><div class="row"><button class="btn big">Закрыть</button></div>`);$('.btn',m).onclick=()=>m.remove()}
   };
   setup();
+};
+
+// ---------- Фарм ----------
+PAGES.farm=el=>{
+  let got=0;
+  el.innerHTML=`<h1 class="ttl">Фарм</h1><p class="sub">+100 монет за каждый клик.</p><div class="farm"><button class="fbtn" id="fb">+100</button><div id="fc" class="mut">За эту сессию: ${fmt(0)}</div></div>`;
+  const box=$('.farm',el);
+  $('#fb',el).onclick=e=>{
+    st.bal+=100;got+=100;save();beep(1400,.04,'sine',.04);
+    $('#fc',el).innerHTML=`За эту сессию: ${fmt(got)}`;
+    const r=box.getBoundingClientRect(),p=document.createElement('div');p.className='plus';p.textContent='+100';
+    p.style.left=(e.clientX?e.clientX-r.left-30:r.width/2-30)+'px';p.style.top=(e.clientY?e.clientY-r.top-20:r.height/2)+'px';
+    box.append(p);setTimeout(()=>p.remove(),900);
+  };
 };
 
 // ---------- бонус и звук ----------
