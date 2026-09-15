@@ -153,7 +153,9 @@ main{max-width:1240px;margin:auto;padding:26px 16px 60px}
 .sum{margin-top:12px;font-weight:700}
 .wheel{position:relative;width:290px;height:290px;margin:0 auto 8px}
 .wheel svg{width:100%;height:100%;filter:drop-shadow(0 0 20px #ffb80040);transition:filter .4s}
-.needle{position:absolute;inset:0}.needle i{position:absolute;left:50%;top:6px;width:6px;height:34px;margin-left:-3px;border-radius:4px;background:#fff;box-shadow:0 0 10px #fff,0 0 26px var(--gold)}
+.needle{position:absolute;inset:0;will-change:transform}
+.wheel.spin svg{animation:wglow 1.2s ease-in-out infinite}
+@keyframes wglow{50%{filter:drop-shadow(0 0 36px #ffb800aa)}}.needle i{position:absolute;left:50%;top:6px;width:6px;height:34px;margin-left:-3px;border-radius:4px;background:#fff;box-shadow:0 0 10px #fff,0 0 26px var(--gold)}
 .mid{position:absolute;inset:58px;border-radius:50%;display:grid;place-content:center;text-align:center;background:radial-gradient(#1c2030,#0d0f16);box-shadow:inset 0 0 0 1px #ffffff12,0 10px 30px #0008}
 .mid b{font:800 34px Unbounded;transition:color .3s}.mid b small{font-size:17px}.mid span{font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.1em}
 .wheel.win svg{filter:drop-shadow(0 0 34px var(--green))}.wheel.win .mid b{color:var(--green)}
@@ -236,6 +238,7 @@ const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelecto
 const rnd=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;
 const pick=a=>a[Math.floor(rnd()*a.length)];
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const pct=p=>p>=10?p.toFixed(1):p>=.1?p.toFixed(2):p>=.0001?p.toPrecision(2):'<0.0001';
 const fmt=n=>`<i class="co"></i>${Math.round(n).toLocaleString('ru')}`;
 const RC=['#b0c3d9','#5e98d9','#4b69ff','#8847ff','#d32ce6','#eb4b4b','#ffd700'];
 const TN=['Ширпотреб','Промышленное','Армейское','Запрещённое','Засекреченное','Тайное','★ Редкий особый предмет'];
@@ -272,55 +275,48 @@ function fromVar(v){const s=SKINS[v.id];let f=null;if(!s.nw){const lo=Math.max(W
 const CS_ODDS={2:79.92,3:15.98,4:3.2,5:.64,6:.26}; // официальные шансы CS2
 const CASES=[];
 function addCase(c){
-  c.tiers=c.tiers.filter(t=>t.items.length&&t.w>0).sort((a,b)=>b.t-a.t);
-  c.W=c.tiers.reduce((a,t)=>a+t.w,0);
-  c.ev=c.tiers.reduce((a,t)=>a+t.w/c.W*t.items.reduce((x,i)=>x+SKINS[i].ev,0)/t.items.length,0);
+  c.items=c.items.filter(x=>x.w>0);
+  c.W=c.items.reduce((a,x)=>a+x.w,0);
+  c.ev=c.items.reduce((a,x)=>a+x.w*SKINS[x.id].ev,0)/c.W;
   if(!c.p)c.p=Math.ceil(c.ev/.9);
-  const all=c.tiers.flatMap(t=>t.items),top=all.reduce((a,i)=>SKINS[i].ev>SKINS[a].ev?i:a,all[0]);
-  c.color=RC[SKINS[top][1]];
-  if(!c.img)c.img=IMG+SKINS[top][2];
+  const top=c.items.reduce((a,x)=>SKINS[x.id].ev>SKINS[a.id].ev?x:a);
+  c.color=RC[SKINS[top.id][1]];
+  if(!c.img)c.img=IMG+SKINS[top.id][2];
+  let acc=0;c.cum=c.items.map(x=>acc+=x.w);
   CASES.push(c);
 }
 function roll(c){
-  let x=rnd()*c.W;
-  for(const t of c.tiers)if((x-=t.w)<0)return mkItem(SKINS[pick(t.items)]);
-  return mkItem(SKINS[pick(c.tiers.at(-1).items)]);
+  const x=rnd()*c.W;let lo=0,hi=c.cum.length-1;
+  while(lo<hi){const m=(lo+hi)>>1;if(c.cum[m]>x)hi=m;else lo=m+1}
+  return mkItem(SKINS[c.items[lo].id]);
 }
 const isGlove=s=>/Gloves|Hand Wraps/.test(s[0]),isKnife=s=>s[1]===6&&!isGlove(s);
 const wpn=(...w)=>s=>w.some(x=>s[0].startsWith(x+' |'));
-function themed(n,f,weights){addCase({themed:1,n,tiers:Object.entries(weights).map(([t,w])=>({t:+t,w,items:SKINS.filter(s=>s[1]===+t&&f(s)).map(s=>s.id)}))})}
-const GUN={0:40,1:25,2:22,3:9,4:3.2,5:.8};
-themed('Бюджетный',()=>1,{0:55,1:28,2:13,3:4});
-themed('Пистолетный',wpn('Glock-18','USP-S','P2000','P250','Desert Eagle','Five-SeveN','Tec-9','CZ75-Auto','Dual Berettas','R8 Revolver'),GUN);
-themed('AWP',wpn('AWP'),GUN);
-themed('AK-47',wpn('AK-47'),GUN);
-themed('M4',wpn('M4A4','M4A1-S'),GUN);
-themed('Тайный',s=>1,{5:1});
-themed('Нож или ширпотреб',s=>s[1]===0||isKnife(s),{0:50,6:50});
-themed('Перчатки',isGlove,{6:1});
-themed('Ножи',isKnife,{6:1});
-const band=(lo,hi)=>s=>s.ev>=lo&&s.ev<hi,starts=(...n)=>s=>n.some(x=>s[0].startsWith(x));
-themed('Мелочь',band(0,30),{0:1,1:1,2:1,3:1});
-themed('Сотка',band(30,300),{0:30,1:30,2:25,3:12,4:3});
-themed('Glock-18',wpn('Glock-18'),GUN);
-themed('USP-S',wpn('USP-S'),GUN);
-themed('Desert Eagle',wpn('Desert Eagle'),GUN);
-themed('Средний класс',band(300,3000),{2:50,3:30,4:15,5:5});
-themed('Засекреченный',s=>1,{4:1});
-themed('AWP премиум',wpn('AWP'),{3:55,4:33,5:12});
-themed('AK-47 премиум',wpn('AK-47'),{3:55,4:33,5:12});
-themed('Дорогие скины',band(3000,30000),{3:20,4:30,5:50});
-themed('Дешёвые ножи',s=>isKnife(s)&&s.ev<40000,{6:1});
-themed('Спортивные перчатки',starts('★ Sport Gloves'),{6:1});
-themed('Karambit',starts('★ Karambit'),{6:1});
-themed('Butterfly Knife',starts('★ Butterfly Knife'),{6:1});
-themed('M9 Bayonet',starts('★ M9 Bayonet'),{6:1});
-themed('Коллекционер',band(100000,1e9),{3:1,4:1,5:1,6:1});
+const starts=(...n)=>s=>n.some(x=>s[0].startsWith(x));
+// Тематические кейсы: цена дропа распределена логнормально вокруг цены кейса —
+// в основном среднячок, крупные иксы и копеечный дроп редко. Центр подбирается под окупаемость 90%.
+const SIG=.8;
+function themed(n,P,f){
+  const pool=SKINS.filter(f),L=pool.map(s=>Math.log(s.ev)),bin=L.map(l=>Math.floor(l/.25)),cnt={};
+  bin.forEach(b=>cnt[b]=(cnt[b]||0)+1);
+  const make=mu=>pool.map((s,i)=>({id:s.id,w:Math.exp(-((L[i]-Math.log(P)-mu)**2)/(2*SIG*SIG))/cnt[bin[i]]}));
+  const EV=it=>{let W=0,E=0;for(const x of it){W+=x.w;E+=x.w*SKINS[x.id].ev}return E/W};
+  let lo=-8,hi=4;for(let k=0;k<40;k++){const m=(lo+hi)/2;EV(make(m))<.9*P?lo=m:hi=m}
+  const items=make(lo),e=EV(items);
+  addCase({themed:1,n,items,p:Math.abs(e-.9*P)<.03*P?P:Math.ceil(e/.9)});
+}
+const PISTOL=wpn('Glock-18','USP-S','P2000','P250','Desert Eagle','Five-SeveN','Tec-9','CZ75-Auto','Dual Berettas','R8 Revolver');
+[['Мелочь',15,()=>1],['Сотка',100,()=>1],['Бюджетный',500,()=>1],['Пистолетный',1000,PISTOL],['Glock-18',1500,wpn('Glock-18')],['USP-S',2000,wpn('USP-S')],
+ ['Desert Eagle',2500,wpn('Desert Eagle')],['AK-47',3000,wpn('AK-47')],['M4',3500,wpn('M4A4','M4A1-S')],['AWP',4000,wpn('AWP')],['Средний класс',7000,()=>1],
+ ['Засекреченный',10000,s=>s[1]===4||s[1]===5],['AK-47 премиум',15000,wpn('AK-47')],['AWP премиум',20000,wpn('AWP')],['Дешёвые ножи',20000,s=>isKnife(s)&&s.ev<40000],
+ ['Дорогие скины',30000,()=>1],['Тайный',50000,s=>s[1]===5],['Перчатки',60000,isGlove],['Ножи',80000,isKnife],['Спортивные перчатки',150000,starts('★ Sport Gloves')],
+ ['Karambit',250000,starts('★ Karambit')],['M9 Bayonet',250000,starts('★ M9 Bayonet')],['Butterfly Knife',300000,starts('★ Butterfly Knife')],['Коллекционер',500000,()=>1]
+].forEach(a=>themed(...a));
 CASES.forEach(c=>{if(c.themed)c.g=c.p<1000?'Недорогие кейсы':c.p<20000?'Средние кейсы':'Дорогие кейсы'});
 CASES.sort((a,b)=>(!!b.themed-!!a.themed)||(a.themed?a.p-b.p:0));
 REAL.slice().reverse().forEach(([n,img,p,ids,rare])=>{
   const by={};ids.forEach(i=>(by[SKINS[i][1]]??=[]).push(i));if(rare.length)by[6]=rare;
-  addCase({g:'Официальные кейсы CS2',n,p,img:img.startsWith('http')?img:IMG+img,tiers:Object.keys(CS_ODDS).map(t=>({t:+t,w:CS_ODDS[t],items:by[t]||[]}))});
+  addCase({g:'Официальные кейсы CS2',n,p,img:img.startsWith('http')?img:IMG+img,items:Object.keys(CS_ODDS).flatMap(t=>(by[t]||[]).map(id=>({id,w:CS_ODDS[t]/by[t].length})))});
 });
 
 // ---------- состояние ----------
@@ -431,12 +427,12 @@ PAGES.open=(el,c)=>{
   const range=s=>{const p=VARS.filter(v=>v.id===s.id).map(v=>v.p);return Math.min(...p)===Math.max(...p)?fmt(p[0]):fmt(Math.min(...p))+'+'};
   el.innerHTML=`<button class="back" data-go="cases">← Все кейсы</button>
   <div class="ohead" style="--c:${c.color}"><div class="cimg"><img src="${c.img}" alt=""></div><div><h1 class="ttl">${c.n}</h1>
-   <div class="facts"><div><small>Цена</small>${fmt(c.p)}</div><div><small>Средний дроп</small>${fmt(c.ev)}</div><div><small>Окупаемость</small>${(c.ev/c.p*100).toFixed(1)}%</div><div><small>Предметов</small>${c.tiers.reduce((a,t)=>a+t.items.length,0)}</div></div></div></div>
+   <div class="facts"><div><small>Цена</small>${fmt(c.p)}</div><div><small>Средний дроп</small>${fmt(c.ev)}</div><div><small>Окупаемость</small>${(c.ev/c.p*100).toFixed(1)}%</div><div><small>Предметов</small>${c.items.length}</div><div><small>Шанс окупиться</small>${pct(c.items.reduce((a,x)=>a+(SKINS[x.id].ev>=c.p?x.w:0),0)/c.W*100)}%</div></div></div></div>
   <div id="reels"></div>
   <div class="ctrl"><div class="seg" id="modes">${[['h','Лента'],['v','Барабан'],['f','Быстро']].map(([k,t])=>`<button data-m="${k}">${t}</button>`).join('')}</div>
   <div class="seg" id="cnt">${[1,2,3,4,5].map(n=>`<button data-n="${n}">x${n}</button>`).join('')}</div><button class="btn big" id="go"></button></div>
-  <div class="note">Предмет выбирается криптографическим генератором: сначала редкость по шансам ниже, затем скин внутри редкости равновероятно, float — равномерно в диапазоне скина, StatTrak — 10% (если бывает). Цена продажи — рыночная.</div>
-  <h2 class="gh">Содержимое и шансы</h2>${c.tiers.map(t=>{const ch=t.w/c.W*100;return`<div class="tierh" style="--c:${RC[t.t]}"><span>${TN[t.t]}</span><b>${ch.toFixed(2)}% · каждый ${(ch/t.items.length).toPrecision(3)}%</b></div><div class="grid sm">${t.items.slice().sort((a,b)=>SKINS[b].ev-SKINS[a].ev).slice(0,60).map(i=>card({id:i,w:-1},{price:range(SKINS[i]),lazy:1})).join('')}</div>${t.items.length>60?`<p class="mut" style="margin-top:8px">и ещё ${t.items.length-60}</p>`:''}`}).join('')}`;
+  <div class="note">Предмет выбирается криптографическим генератором: предмет — строго по шансам ниже, float — равномерно в диапазоне скина, StatTrak — 10% (если бывает). Цена продажи — рыночная.</div>
+  <h2 class="gh">Содержимое и шансы</h2>${[6,5,4,3,2,1,0].map(t=>{const it=c.items.filter(x=>SKINS[x.id][1]===t);if(!it.length)return'';const ch=it.reduce((a,x)=>a+x.w,0)/c.W*100,shown=it.slice().sort((a,b)=>b.w-a.w).slice(0,60).sort((a,b)=>SKINS[b.id].ev-SKINS[a.id].ev);return`<div class="tierh" style="--c:${RC[t]}"><span>${TN[t]}</span><b>${pct(ch)}%</b></div><div class="grid sm">${shown.map(x=>card({id:x.id,w:-1},{price:range(SKINS[x.id]),tag:pct(x.w/c.W*100)+'%',lazy:1})).join('')}</div>${it.length>60?`<p class="mut" style="margin-top:8px">и ещё ${it.length-60} с меньшими шансами</p>`:''}`}).join('')}`;
   const reels=$('#reels',el),btn=$('#go',el);
   const draw=()=>{
     const v=st.mode==='v';
@@ -478,7 +474,7 @@ PAGES.inv=el=>{
 
 // ---------- Апгрейд ----------
 // шанс = ставка / цена цели, без комиссии
-const up={sel:[],t:null,under:true,fast:false,busy:false,rot:0,m:2,q:''};
+const up={sel:[],t:null,under:true,mode:'n',busy:false,rot:0,m:2,q:''};
 PAGES.upgrade=el=>{
   up.sel=up.sel.filter(byUid);
   el.innerHTML=`<h1 class="ttl">Апгрейд</h1><p class="sub">Поставь до 6 предметов и выбери цель. Шанс = стоимость ставки / стоимость цели, без комиссии.</p><div id="ut"></div>
@@ -491,17 +487,17 @@ PAGES.upgrade=el=>{
     const items=up.sel.map(byUid),s=sum(),t=up.t,p=chance(),C=2*Math.PI*84;
     $('#ut',el).innerHTML=`<div class="upg">
     <div class="uslot" id="us">${items.length?`<div class="stack n${items.length}">${items.map(x=>card(x)).join('')}</div><div class="sum">Ставка ${fmt(s)}</div>`:'<div class="ph"><span>＋</span>Выбери свои предметы<small>до 6 штук</small></div>'}</div>
-    <div><div class="wheel" id="wh"><svg viewBox="0 0 200 200"><defs><linearGradient id="ga" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset="1" stop-color="#ff7a00"/></linearGradient></defs>
+    <div><div class="wheel ${up.busy?'spin':''}" id="wh"><svg viewBox="0 0 200 200"><defs><linearGradient id="ga" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe066"/><stop offset="1" stop-color="#ff7a00"/></linearGradient></defs>
       ${Array.from({length:72},(_,i)=>`<line x1="100" y1="2" x2="100" y2="${i%6?6:10}" stroke="#ffffff${i%6?'1c':'44'}" transform="rotate(${i*5} 100 100)"/>`).join('')}
       <circle cx="100" cy="100" r="84" fill="none" stroke="#ffffff0d" stroke-width="16"/>
       <circle cx="100" cy="100" r="84" fill="none" stroke="url(#ga)" stroke-width="16" stroke-dasharray="${p/100*C} ${C}" transform="rotate(${up.under?-90:-90+(100-p)*3.6} 100 100)"/></svg>
       <div class="needle" id="nd" style="transform:rotate(${up.rot}deg)"><i></i></div>
       <div class="mid"><b>${p.toFixed(2)}<small>%</small></b><span>${p?'x'+(t.p/s).toFixed(2):'шанс'}</span></div></div>
-      <div class="row"><div class="seg"><button data-ud="1" class="${up.under?'on':''}">Снизу</button><button data-ud="0" class="${up.under?'':'on'}">Сверху</button></div><div class="seg"><button id="uf" class="${up.fast?'on':''}">Быстро</button></div></div>
+      <div class="row"><div class="seg"><button data-ud="1" class="${up.under?'on':''}">Снизу</button><button data-ud="0" class="${up.under?'':'on'}">Сверху</button></div><div class="seg"><button data-um="n" class="${up.mode==='n'?'on':''}">Обычный</button><button data-um="g" class="${up.mode==='g'?'on':''}">Азартный</button></div></div>
       <button class="btn big wide" id="ub" ${p&&!up.busy?'':'disabled'}>${up.busy?'Крутим…':'Апгрейд'}</button></div>
     <div class="uslot" id="ud">${t?card(t,{cls:'big',price:fmt(t.p)}):'<div class="ph"><span>◎</span>Выбери цель<small>из списка ниже</small></div>'}</div></div>`;
     $$('[data-ud]',el).forEach(b=>b.onclick=()=>{if(!up.busy){up.under=b.dataset.ud==='1';top()}});
-    $('#uf',el).onclick=()=>{if(!up.busy){up.fast=!up.fast;top()}};
+    $$('[data-um]',el).forEach(b=>b.onclick=()=>{if(!up.busy){up.mode=b.dataset.um;top()}});
     $('#ub',el).onclick=run;
   };
   const mine=()=>{
@@ -529,12 +525,18 @@ PAGES.upgrade=el=>{
   const run=async()=>{
     const t=up.t,p=chance(),ang=rnd()*360,win=up.under?ang<p*3.6:ang>=360-p*3.6;
     up.busy=true;top();
-    const nd=$('#nd',el),to=360*(up.fast?3:8)+ang;
-    const a=nd.animate([{transform:`rotate(${up.rot}deg)`},{transform:`rotate(${to}deg)`}],{duration:up.fast?1400:5600,easing:'cubic-bezier(.12,.8,.2,1)',fill:'forwards'});
+    const nd=$('#nd',el),r=d=>({transform:`rotate(${d}deg)`}),b=up.rot;let kf,dur;
+    if(up.mode==='g'){ // азартный: разгон, разворот назад, снова вперёд, проскок и откат к результату
+      const to=360*7+ang,sd=rnd()<.5?1:-1;
+      kf=[{...r(b),easing:'cubic-bezier(.6,0,.4,1)'},{...r(b+900+rnd()*360),offset:.22,easing:'cubic-bezier(.3,0,.5,1)'},{...r(b+300+rnd()*200),offset:.4,easing:'cubic-bezier(.5,0,.3,1)'},
+          {...r(to+sd*(30+rnd()*40)),offset:.72,easing:'cubic-bezier(.4,0,.4,1)'},{...r(to-sd*(10+rnd()*15)),offset:.87,easing:'cubic-bezier(.4,0,.3,1)'},{...r(to),offset:1}];
+      dur=6800;
+    }else{kf=[r(b),r(360*5+ang)];dur=7500}
+    const a=nd.animate(kf,{duration:dur,easing:up.mode==='g'?'linear':'cubic-bezier(.25,.1,.05,1)',fill:'forwards'});
     let last=0;(function loop(){if(a.playState==='finished'||a.playState==='idle')return;const m=new DOMMatrix(getComputedStyle(nd).transform),g=Math.floor((Math.atan2(m.b,m.a)*180/Math.PI+360)/10);if(g!==last){last=g;tick()}requestAnimationFrame(loop)})();
     await a.finished;up.rot=ang;
     const used=up.sel.slice();st.inv=st.inv.filter(x=>!used.includes(x.uid));st.stats.upT++;
-    const wh=$('#wh',el);
+    const wh=$('#wh',el);wh.classList.remove('spin');
     if(win){st.stats.upW++;const g=give(fromVar(t));up.sel=[g.uid];wh.classList.add('win');$('#ud .it',el).classList.add('hit');confetti(['#3dff8a','#ffd700','#fff']);chime();feed(g,'Ты');toast(`Апгрейд успешен: <b>${SKINS[t.id][0]}</b>`)}
     else{up.sel=[];wh.classList.add('lose');$$('#us .it',el).forEach(d=>d.classList.add('burn'));sad();toast('Апгрейд не удался')}
     save();await wait(1700);
