@@ -211,6 +211,12 @@ main{max-width:1240px;margin:auto;padding:26px 16px 60px}
 .stats small{display:block;color:var(--mut);font-size:12px}.stats b{font-size:18px}
 .stats .best{display:flex;align-items:center;gap:10px;border-color:var(--c)}.best img{width:70px}.best b{font-size:13px}
 .empty{text-align:center;padding:60px 0;color:var(--mut)}
+.mbox.tosbox{max-width:700px}
+.tos{text-align:left;max-width:600px;margin:18px auto;display:grid;gap:11px;padding-left:24px}
+.tos li{color:var(--mut);line-height:1.45}.tos li::marker{color:var(--gold);font-weight:700}
+.tosok{display:inline-flex;gap:10px;align-items:center;cursor:pointer;margin-top:6px}
+.tosok input{width:18px;height:18px;margin:0;padding:0;accent-color:var(--gold);cursor:pointer}
+.lnk{color:var(--mut);text-decoration:underline;font-size:13px}.lnk:hover{color:var(--txt)}
 .farm{display:grid;place-items:center;gap:18px;padding:40px 16px;border-radius:26px;border:1px solid var(--line);background:radial-gradient(40% 60% at 50% 45%,#ffb80018,transparent),var(--s1);position:relative;overflow:hidden;user-select:none}
 .fbtn{width:220px;height:220px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff6c2,#ffc629 42%,#b86e00);box-shadow:0 0 60px #ffb80066,inset 0 -10px 20px #0004;font:800 44px Unbounded;color:#5a3500;transition:transform .08s}
 .fbtn:hover{box-shadow:0 0 90px #ffb80099,inset 0 -10px 20px #0004}.fbtn:active{transform:scale(.92)}
@@ -324,7 +330,7 @@ CASES.sort((a,b)=>(!!b.themed-!!a.themed)||(a.themed?a.p-b.p:0));
 REAL.slice().reverse().forEach(([n,img,p,ids,rare])=>themed(n,p,[...ids,...rare],{g:'Официальные кейсы CS2',img:img.startsWith('http')?img:IMG+img}));
 
 // ---------- состояние ----------
-const DEF={bal:3000,inv:[],bonus:0,xp:0,n:0,sound:true,mode:'h',stats:{opened:0,best:null,upW:0,upT:0,ct:0,bw:0,bt:0}};
+const DEF={tos:0,bal:3000,inv:[],bonus:0,xp:0,n:0,sound:true,mode:'h',stats:{opened:0,best:null,upW:0,upT:0,ct:0,bw:0,bt:0}};
 let st=structuredClone(DEF);
 try{const o=JSON.parse(localStorage.kb2);if(o){Object.assign(st,o);st.stats={...DEF.stats,...o.stats}}}catch(e){}
 const lvl=()=>Math.floor(Math.sqrt(st.xp/2000))+1;
@@ -412,7 +418,7 @@ function go(p,arg){
   if(p!=='open')history.replaceState(null,'','#'+p);
   scrollTo(0,0);
 }
-document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g)go(g.dataset.go)});
+document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g)go(g.dataset.go);if(e.target.closest('[data-tos]'))showTOS(true)});
 
 const caseCard=(c,cls='')=>`<div class="case ${cls}" data-c="${CASES.indexOf(c)}" style="--c:${c.color}"><div class="cimg"><img src="${c.img}" alt="" loading="lazy"></div><h3>${c.n}</h3><div class="rtp">окупаемость ${Math.round(c.ev/c.p*100)}%</div><div class="price">${fmt(c.p)}</div></div>`;
 
@@ -423,6 +429,7 @@ PAGES.cases=el=>{
     <div class="row l"><button class="btn big" data-go="battles">Кейс-батл</button><button class="btn big ghost" data-go="upgrade">Апгрейд</button><button class="btn big ghost" data-go="contracts">Контракт</button></div></div>
     <div class="hs">${hs.map((v,i)=>`<img class="fl f${i}" src="${IMG+SKINS[v.id][2]}" alt="">`).join('')}</div></section>`
     +[...new Set(CASES.map(c=>c.g))].map(g=>`<h2 class="gh">${g}</h2><div class="cases">${CASES.filter(c=>c.g===g).map(c=>caseCard(c)).join('')}</div>`).join('');
+  el.insertAdjacentHTML('beforeend','<p style="margin:34px 0 0;text-align:center"><button class="lnk" data-tos>Пользовательское соглашение</button></p>');
   $$('.case',el).forEach(x=>x.onclick=()=>go('open',CASES[x.dataset.c]));
 };
 
@@ -654,6 +661,38 @@ PAGES.battles=el=>{
   setup();
 };
 
+// ---------- Пользовательское соглашение (рофл) ----------
+const TOS=[
+ 'Подтверждаю, что я девственник. Если это перестанет быть правдой, обязуюсь закрыть вкладку.',
+ 'Подтверждаю наличие дефектов речи: букву «р» произношу по настроению, слово «Karambit» — вообще никак.',
+ 'Понимаю, что монеты здесь ненастоящие, как и мои шансы выбить нож.',
+ 'Обязуюсь после каждого проигрыша говорить «ну ещё один и всё» минимум три раза подряд.',
+ 'Признаю, что апгрейд на 3% — это не инвестиция, а образ жизни.',
+ 'Соглашаюсь, что мой инвентарь стоит дешевле, чем чехол на моём телефоне.',
+ 'Если выбью Dragon Lore — обязуюсь сделать скриншот и разослать всем, включая бывших одноклассников.',
+ 'Подтверждаю, что открываю кейсы на паре, на работе или лёжа лицом в подушку.',
+ 'В проигрыше обязуюсь винить сайт, рандом, Valve, соседский вайфай и ретроградный Меркурий.',
+ 'Подтверждаю, что прочитал это соглашение по диагонали, а этот пункт вообще пропустил.',
+ 'Разрешаю администрации смеяться над моим дропом, особенно над P250 за 3 монеты.',
+ 'Подтверждаю, что мои ставки не согласованы с мамой.',
+ 'Понимаю, что вывести скины нельзя ни в Steam, ни в реальную жизнь, ни в загробную.',
+ 'Обязуюсь писать «изи» только когда везёт, и «сайт сломан» во всех остальных случаях.',
+ 'В случае обнуления баланса обязуюсь мужественно нажать кнопку «Фарм» 30 раз.',
+];
+function showTOS(again){
+  const m=modal(`<h3 class="mt">Пользовательское соглашение</h3><p class="mut">Редакция 1.0 · юридической силы: ноль</p>
+   <ol class="tos">${TOS.map(t=>`<li>${t}</li>`).join('')}</ol>
+   ${again?'<div class="row"><button class="btn big" id="tclose">Закрыть</button></div>'
+   :`<label class="tosok"><input type="checkbox" id="tchk"> Прочитал полностью и подтверждаю каждый пункт</label>
+     <div class="row"><button class="btn big" id="tok" disabled>Принимаю</button><button class="btn big ghost" id="tno">Не принимаю</button></div>`}`,'tosbox',null,true);
+  if(again)return $('#tclose',m).onclick=()=>m.remove();
+  $('#tchk',m).onchange=e=>$('#tok',m).disabled=!e.target.checked;
+  const no=$('#tno',m);
+  const dodge=()=>{no.style.position='relative';no.style.left=(rnd()*260-130)+'px';no.style.top=(rnd()*90-45)+'px'};
+  no.onmouseenter=dodge;no.onclick=()=>{dodge();toast('Кнопка не работает. Как и твой апгрейд на 3%')};
+  $('#tok',m).onclick=()=>{st.tos=1;save();m.remove();confetti(['#ffd700','#fff4b0','#fff'],90);toast('Соглашение принято. Пути назад нет')};
+}
+
 // ---------- Фарм ----------
 PAGES.farm=el=>{
   let got=0;
@@ -679,6 +718,7 @@ $('#snd').onclick=()=>{st.sound=!st.sound;save()};
 setInterval(bonusUI,1000);
 
 save();bonusUI();
+if(!st.tos)showTOS();
 const h=location.hash.slice(1);go(PAGES[h]&&h!=='open'?h:'cases');
 </script>
 </body>
